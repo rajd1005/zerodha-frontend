@@ -4,6 +4,7 @@ import { useState } from 'react';
 import axios from 'axios';
 import { useRouter } from 'next/navigation';
 import { Lock, Mail, TrendingUp } from 'lucide-react';
+import Link from 'next/link';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -11,7 +12,7 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://your-railway-app-url.up.railway.app/api';
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api';
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -24,9 +25,11 @@ export default function LoginPage() {
         password
       });
 
+      // Save the JWT token and user details securely
       localStorage.setItem('token', response.data.token);
       localStorage.setItem('user', JSON.stringify(response.data));
 
+      // Redirect to the dashboard
       window.location.href = '/dashboard';
       
     } catch (err) {
@@ -38,6 +41,8 @@ export default function LoginPage() {
 
   return (
     <div className="flex flex-col h-screen px-6 pt-20 pb-10">
+      
+      {/* App Logo & Header */}
       <div className="flex flex-col items-center mb-12">
         <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-blue-200">
           <TrendingUp className="text-white w-8 h-8" />
@@ -46,7 +51,9 @@ export default function LoginPage() {
         <p className="text-gray-500 mt-2 text-sm">Sign in to manage your connected accounts</p>
       </div>
 
+      {/* Login Form */}
       <form onSubmit={handleLogin} className="flex flex-col gap-4 flex-grow">
+        
         {error && (
           <div className="bg-red-50 text-red-600 p-3 rounded-xl text-sm font-medium text-center border border-red-100">
             {error}
@@ -81,6 +88,12 @@ export default function LoginPage() {
           />
         </div>
 
+        <div className="flex justify-end mt-1">
+          <Link href="/forgot-password" size="sm" className="text-blue-600 text-sm font-semibold hover:underline">
+            Forgot Password?
+          </Link>
+        </div>
+
         <button 
           type="submit" 
           disabled={loading}
@@ -92,6 +105,10 @@ export default function LoginPage() {
             "Log In"
           )}
         </button>
+
+        <p className="text-center text-gray-500 text-sm mt-6">
+          New to the system? <Link href="/register" className="text-blue-600 font-bold">Create Account</Link>
+        </p>
       </form>
     </div>
   );
