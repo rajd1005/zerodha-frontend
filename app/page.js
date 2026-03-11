@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import axios from 'axios';
-import { useRouter } from 'navigation'; // Fix: Next.js 13+ uses next/navigation
+import { useRouter } from 'next/navigation';
 import { Lock, Mail, TrendingUp } from 'lucide-react';
 
 export default function LoginPage() {
@@ -11,7 +11,6 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   
-  // Use your live Railway backend URL here
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://your-railway-app-url.up.railway.app/api';
 
   const handleLogin = async (e) => {
@@ -25,11 +24,9 @@ export default function LoginPage() {
         password
       });
 
-      // Save the JWT token securely
       localStorage.setItem('token', response.data.token);
       localStorage.setItem('user', JSON.stringify(response.data));
 
-      // Redirect to the dashboard
       window.location.href = '/dashboard';
       
     } catch (err) {
@@ -41,8 +38,6 @@ export default function LoginPage() {
 
   return (
     <div className="flex flex-col h-screen px-6 pt-20 pb-10">
-      
-      {/* App Logo & Header */}
       <div className="flex flex-col items-center mb-12">
         <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-blue-200">
           <TrendingUp className="text-white w-8 h-8" />
@@ -51,9 +46,7 @@ export default function LoginPage() {
         <p className="text-gray-500 mt-2 text-sm">Sign in to manage your connected accounts</p>
       </div>
 
-      {/* Login Form */}
       <form onSubmit={handleLogin} className="flex flex-col gap-4 flex-grow">
-        
         {error && (
           <div className="bg-red-50 text-red-600 p-3 rounded-xl text-sm font-medium text-center border border-red-100">
             {error}
@@ -86,12 +79,6 @@ export default function LoginPage() {
             className="w-full pl-11 pr-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition-all text-gray-900"
             placeholder="Password"
           />
-        </div>
-
-        <div className="flex justify-end mt-1">
-          <button type="button" className="text-blue-600 text-sm font-semibold hover:underline">
-            Forgot Password?
-          </button>
         </div>
 
         <button 
