@@ -3,13 +3,13 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import BottomNav from '@/components/BottomNav';
+import PushManager from '@/components/PushManager';
 
 export default function DashboardLayout({ children }) {
   const router = useRouter();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    // Check if the user is logged in
     const token = localStorage.getItem('token');
     if (!token) {
       router.push('/');
@@ -24,12 +24,13 @@ export default function DashboardLayout({ children }) {
 
   return (
     <div className="flex flex-col h-screen bg-gray-50 relative pb-16">
-      {/* Scrollable Content Area */}
+      {/* Background Notification Manager */}
+      <PushManager />
+
       <div className="flex-1 overflow-y-auto w-full">
         {children}
       </div>
       
-      {/* Mobile App Navigation */}
       <BottomNav />
     </div>
   );
