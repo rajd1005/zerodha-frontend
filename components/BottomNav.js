@@ -3,14 +3,13 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Send, Key, Users } from 'lucide-react';
+import { LayoutDashboard, Send, Key, Users, ShoppingBag } from 'lucide-react';
 
 export default function BottomNav() {
   const pathname = usePathname();
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
-    // Check local storage to see if the logged-in user is an admin
     const userData = localStorage.getItem('user');
     if (userData) {
       const parsedUser = JSON.parse(userData);
@@ -23,10 +22,10 @@ export default function BottomNav() {
   const navItems = [
     { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
     { name: 'Trade', path: '/dashboard/trade', icon: Send },
+    { name: 'Basket', path: '/dashboard/basket', icon: ShoppingBag }, // Added Basket here
     { name: 'Brokers', path: '/dashboard/broker', icon: Key },
   ];
 
-  // Inject the Admin tab if the user has admin privileges
   if (isAdmin) {
     navItems.push({ name: 'Admin', path: '/dashboard/admin', icon: Users });
   }
