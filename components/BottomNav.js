@@ -1,17 +1,35 @@
 "use client";
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Send, Key } from 'lucide-react';
+import { LayoutDashboard, Send, Key, Users } from 'lucide-react';
 
 export default function BottomNav() {
   const pathname = usePathname();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    // Check local storage to see if the logged-in user is an admin
+    const userData = localStorage.getItem('user');
+    if (userData) {
+      const parsedUser = JSON.parse(userData);
+      if (parsedUser.role === 'admin') {
+        setIsAdmin(true);
+      }
+    }
+  }, []);
 
   const navItems = [
     { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
     { name: 'Trade', path: '/dashboard/trade', icon: Send },
     { name: 'Brokers', path: '/dashboard/broker', icon: Key },
   ];
+
+  // Inject the Admin tab if the user has admin privileges
+  if (isAdmin) {
+    navItems.push({ name: 'Admin', path: '/dashboard/admin', icon: Users });
+  }
 
   return (
     <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white border-t border-gray-200 pb-safe shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-50">
