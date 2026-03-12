@@ -151,18 +151,17 @@ function BrokerContent() {
 
               {/* Automated Login Button / Status */}
               <div className="mt-4 pt-4 border-t border-gray-100">
-                {acc.accessToken ? (
-                  <div className="text-sm font-medium text-green-600 flex items-center justify-center gap-2 py-2 bg-green-50 rounded-xl">
-                    <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> Connected Today
+                {acc.accessToken && (
+                  <div className="text-sm font-medium text-green-600 flex items-center justify-center gap-2 py-2 mb-3 bg-green-50 rounded-xl">
+                    <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> Token Saved
                   </div>
-                ) : (
-                  <button 
-                    onClick={() => initiateZerodhaLogin(acc)}
-                    className="w-full bg-[#ff5722] text-white py-3 rounded-xl font-bold flex justify-center items-center gap-2 shadow-md active:scale-95 transition"
-                  >
-                    Log in with Zerodha <ExternalLink className="w-4 h-4" />
-                  </button>
                 )}
+                <button 
+                  onClick={() => initiateZerodhaLogin(acc)}
+                  className="w-full bg-[#ff5722] text-white py-3 rounded-xl font-bold flex justify-center items-center gap-2 shadow-md active:scale-95 transition"
+                >
+                  {acc.accessToken ? "Reconnect Zerodha" : "Log in with Zerodha"} <ExternalLink className="w-4 h-4" />
+                </button>
               </div>
             </div>
           ))}
