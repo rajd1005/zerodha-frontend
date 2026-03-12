@@ -114,15 +114,22 @@ export default function TradePage() {
     setShowChain(false);
   };
 
-  const loadOptionChain = async () => {
+const loadOptionChain = async () => {
     if (!selectedSymbol || !selectedSymbol.name) return;
     try {
       const token = localStorage.getItem('token');
       const res = await axios.get(`${API_URL}/data/option-chain?symbol=${selectedSymbol.name}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setOptionChain(res.data);
-      setShowChain(true);
+      
+      // FIX: Check if the chain actually exists before showing it
+      if (res.data && res.data.chain && res.data.chain.length > 0) {
+        setOptionChain(res.data);
+        setShowChain(true);
+      } else {
+        alert("No options found for this symbol right now.");
+      }
+      
     } catch (e) {
       alert("Failed to load option chain.");
     }
@@ -238,7 +245,7 @@ export default function TradePage() {
       )}
 
       {/* Option Chain UI */}
-      {showChain && optionChain && (
+      {showChain && optionChain && optionChain.chain && (
         <div className="bg-white border rounded-2xl mb-6 shadow-sm overflow-hidden">
           <div className="bg-gray-900 text-white px-4 py-3 text-sm font-bold flex justify-between">
             <span>{selectedSymbol.name} Options</span>
