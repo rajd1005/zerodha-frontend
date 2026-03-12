@@ -182,10 +182,10 @@ export default function TradePage() {
 
   if (optionChain && optionChain.chain && optionChain.chain.length > 0) {
     let chain = optionChain.chain;
+    let atmIndex = Math.floor(chain.length / 2); // Default to middle of the chain
     
     if (liveLtp) {
       let minDiff = Infinity;
-      let atmIndex = 0;
       
       // Find the At-The-Money (ATM) strike closest to the underlying Live LTP
       chain.forEach((row, idx) => {
@@ -196,14 +196,15 @@ export default function TradePage() {
           atmStrike = row.strike;
         }
       });
-
-      // Slice to get +/- 20 strikes from ATM
-      const startIndex = Math.max(0, atmIndex - 20);
-      const endIndex = Math.min(chain.length, atmIndex + 21);
-      displayChain = chain.slice(startIndex, endIndex);
     } else {
-      displayChain = chain.slice(0, 41); // Fallback if LTP is missing
+      // If LiveLTP is still fetching, fallback to middle
+      atmStrike = chain[atmIndex]?.strike;
     }
+
+    // Slice to get +/- 20 strikes from ATM
+    const startIndex = Math.max(0, atmIndex - 20);
+    const endIndex = Math.min(chain.length, atmIndex + 21);
+    displayChain = chain.slice(startIndex, endIndex);
   }
 
   return (
@@ -278,7 +279,9 @@ export default function TradePage() {
             <div className="bg-gray-900 text-white px-5 py-4 flex justify-between items-center">
               <div>
                 <h3 className="font-bold">{selectedSymbol.name} Options (+/- 20)</h3>
-                <p className="text-xs text-gray-400">Expiry: {optionChain.expiry}</p>
+                <p className="text-xs text-gray-400">
+                  Expiry: {new Date(optionChain.expiry).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                </p>
               </div>
               <button onClick={() => setShowChain(false)} className="p-2 bg-gray-800 rounded-full active:scale-95 transition">
                 <X className="w-5 h-5 text-gray-300" />
