@@ -2,13 +2,19 @@
 
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Search, Send, Target, TrendingDown, Activity } from 'lucide-react';
+import { Search, Send, Target, TrendingDown, Activity, List } from 'lucide-react';
 
 export default function TradePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [selectedSymbol, setSelectedSymbol] = useState(null);
+  
+  // New States for LTP and Option Chain
+  const [liveLtp, setLiveLtp] = useState(null);
+  const [optionChain, setOptionChain] = useState(null);
+  const [chainLtps, setChainLtps] = useState({});
+  const [showChain, setShowChain] = useState(false);
   
   // Trade Form State
   const [transactionType, setTransactionType] = useState('BUY');
@@ -25,14 +31,14 @@ export default function TradePage() {
   const [loading, setLoading] = useState(false);
   const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
-  // Debounced Search Logic
+  // Debounced Search Logic (Updated to search ALL exchanges)
   useEffect(() => {
     const delayDebounceFn = setTimeout(async () => {
-      if (searchQuery.length >= 3) {
+      if (searchQuery.length >= 3 && !selectedSymbol) {
         setIsSearching(true);
         try {
           const token = localStorage.getItem('token');
-          const res = await axios.get(`${API_URL}/data/search?query=${searchQuery}&exchange=NFO`, {
+          const res = await axios.get(`${API_URL}/data/search?query=${searchQuery}&exchange=ALL`, {
             headers: { Authorization: `Bearer ${token}` }
           });
           setSearchResults(res.data);
@@ -47,12 +53,79 @@ export default function TradePage() {
     }, 500);
 
     return () => clearTimeout(delayDebounceFn);
-  }, [searchQuery, API_URL]);
+  }, [searchQuery, API_URL, selectedSymbol]);
+
+  // Live LTP Polling for Selected Symbol
+  useEffect(() => {
+    let interval;
+    if (selectedSymbol && !showChain) {
+      const fetchLtp = async () => {
+        try {
+          const token = localStorage.getItem('token');
+          const instrumentString = `${selectedSymbol.exchange}:${selectedSymbol.tradingsymbol}`;
+          const res = await axios.get(`${API_URL}/data/ltp?instruments=${instrumentString}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          if (res.data && res.data[instrumentString]) {
+            setLiveLtp(res.data[instrumentString].last_price);
+          }
+        } catch (e) { }
+      };
+      fetchLtp();
+      interval = setInterval(fetchLtp, 2000); // Poll every 2 seconds
+    }
+    return () => clearInterval(interval);
+  }, [selectedSymbol, showChain]);
+
+  // Live LTP Polling for Option Chain
+  useEffect(() => {
+    let interval;
+    if (showChain && optionChain) {
+      const fetchChainLtp = async () => {
+        try {
+          const token = localStorage.getItem('token');
+          // Extract all instrument identifiers from the chain to fetch LTP in one go
+          let instruments = [];
+          optionChain.chain.forEach(row => {
+            if(row.CE) instruments.push(`${row.CE.exchange}:${row.CE.tradingsymbol}`);
+            if(row.PE) instruments.push(`${row.PE.exchange}:${row.PE.tradingsymbol}`);
+          });
+          
+          if(instruments.length === 0) return;
+
+          const res = await axios.get(`${API_URL}/data/ltp?instruments=${instruments.join(',')}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          setChainLtps(res.data);
+        } catch (e) { }
+      };
+      fetchChainLtp();
+      interval = setInterval(fetchChainLtp, 2000);
+    }
+    return () => clearInterval(interval);
+  }, [showChain, optionChain]);
 
   const handleSelectSymbol = (instrument) => {
     setSelectedSymbol(instrument);
     setSearchQuery(instrument.tradingsymbol);
     setSearchResults([]);
+    setQuantity(instrument.lot_size || 1); // Auto-set quantity to lot size
+    setLiveLtp(null);
+    setShowChain(false);
+  };
+
+  const loadOptionChain = async () => {
+    if (!selectedSymbol || !selectedSymbol.name) return;
+    try {
+      const token = localStorage.getItem('token');
+      const res = await axios.get(`${API_URL}/data/option-chain?symbol=${selectedSymbol.name}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setOptionChain(res.data);
+      setShowChain(true);
+    } catch (e) {
+      alert("Failed to load option chain.");
+    }
   };
 
   const handlePunchTrade = async (e) => {
@@ -83,8 +156,14 @@ export default function TradePage() {
       alert(res.data.message);
       
       // Reset Form
-      setSearchQuery(''); setSelectedSymbol(null);
-      setQuantity(1); setPrice(''); setTargetPoints(''); setSlPoints(''); setTrailPoints('');
+      setSearchQuery(''); 
+      setSelectedSymbol(null); 
+      setLiveLtp(null);
+      setQuantity(1); 
+      setPrice(''); 
+      setTargetPoints(''); 
+      setSlPoints(''); 
+      setTrailPoints('');
       
     } catch (error) {
       alert("Trade Failed: " + (error.response?.data?.error || error.message));
@@ -100,7 +179,7 @@ export default function TradePage() {
       </h2>
 
       {/* Auto Search Bar */}
-      <div className="relative mb-6 z-10">
+      <div className="relative mb-6 z-20">
         <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
           <Search className="h-5 w-5 text-gray-400" />
         </div>
@@ -109,29 +188,92 @@ export default function TradePage() {
           value={searchQuery}
           onChange={(e) => {
              setSearchQuery(e.target.value);
-             if(selectedSymbol) setSelectedSymbol(null); // Clear selection if user types
+             if(selectedSymbol) {
+               setSelectedSymbol(null);
+               setLiveLtp(null);
+               setShowChain(false);
+             }
           }}
           className="w-full pl-11 pr-4 py-4 bg-white border border-gray-200 shadow-sm rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-600 text-gray-900"
-          placeholder="Search Symbol (e.g. NIFTY24APR22500CE)"
+          placeholder="Search Symbol (e.g. INFY, NIFTY24APR22500CE)"
         />
         {isSearching && <div className="absolute right-4 top-4 text-xs text-blue-600 font-bold">Searching...</div>}
         
         {/* Search Dropdown */}
         {searchResults.length > 0 && !selectedSymbol && (
-          <div className="absolute top-16 left-0 right-0 bg-white border border-gray-200 rounded-2xl shadow-xl max-h-60 overflow-y-auto z-20">
+          <div className="absolute top-16 left-0 right-0 bg-white border border-gray-200 rounded-2xl shadow-xl max-h-60 overflow-y-auto z-30">
             {searchResults.map((item) => (
               <div 
                 key={item.instrument_token} 
                 onClick={() => handleSelectSymbol(item)}
                 className="p-4 border-b border-gray-50 last:border-0 hover:bg-gray-50 active:bg-gray-100 cursor-pointer transition"
               >
-                <p className="font-bold text-gray-900">{item.tradingsymbol}</p>
-                <p className="text-xs text-gray-500">{item.exchange} • Lot Size: {item.lot_size}</p>
+                <div className="flex justify-between items-center">
+                  <p className="font-bold text-gray-900">{item.tradingsymbol}</p>
+                  <span className="text-[10px] bg-gray-100 px-2 py-1 rounded text-gray-600 font-bold">{item.exchange}</span>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">Lot Size: {item.lot_size}</p>
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* Selected Symbol Info & Option Chain Button */}
+      {selectedSymbol && (
+        <div className="bg-blue-50 border border-blue-100 p-4 rounded-2xl mb-6 flex justify-between items-center">
+          <div>
+            <p className="text-sm text-blue-600 font-bold">{selectedSymbol.tradingsymbol}</p>
+            <p className="text-xl font-black text-gray-900 mt-1">
+              {liveLtp ? `₹${liveLtp.toFixed(2)}` : 'Fetching LTP...'}
+            </p>
+          </div>
+          {/* If it's an underlying asset like NIFTY or RELIANCE (no CE/PE), show the chain button */}
+          {!selectedSymbol.tradingsymbol.includes('CE') && !selectedSymbol.tradingsymbol.includes('PE') && (
+            <button onClick={loadOptionChain} className="bg-white text-blue-600 px-3 py-2 rounded-xl text-xs font-bold shadow-sm border border-blue-100 flex items-center gap-1 active:scale-95">
+              <List className="w-3 h-3"/> Option Chain
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Option Chain UI */}
+      {showChain && optionChain && (
+        <div className="bg-white border rounded-2xl mb-6 shadow-sm overflow-hidden">
+          <div className="bg-gray-900 text-white px-4 py-3 text-sm font-bold flex justify-between">
+            <span>{selectedSymbol.name} Options</span>
+            <span className="text-gray-400">Exp: {optionChain.expiry}</span>
+          </div>
+          <div className="max-h-64 overflow-y-auto">
+            <table className="w-full text-xs text-center">
+              <thead className="bg-gray-50 border-b sticky top-0 z-10">
+                <tr>
+                  <th className="py-2 text-green-700">Call LTP</th>
+                  <th className="py-2 bg-gray-100 text-gray-900 font-bold border-x">Strike</th>
+                  <th className="py-2 text-red-700">Put LTP</th>
+                </tr>
+              </thead>
+              <tbody>
+                {optionChain.chain.map((row) => {
+                  const ceLtp = row.CE ? chainLtps[`${row.CE.exchange}:${row.CE.tradingsymbol}`]?.last_price : '-';
+                  const peLtp = row.PE ? chainLtps[`${row.PE.exchange}:${row.PE.tradingsymbol}`]?.last_price : '-';
+                  return (
+                    <tr key={row.strike} className="border-b last:border-0 hover:bg-gray-50">
+                      <td className="py-3 text-green-600 font-medium cursor-pointer" onClick={() => row.CE && handleSelectSymbol(row.CE)}>
+                        {ceLtp}
+                      </td>
+                      <td className="py-3 bg-gray-50 font-bold border-x text-gray-800">{row.strike}</td>
+                      <td className="py-3 text-red-600 font-medium cursor-pointer" onClick={() => row.PE && handleSelectSymbol(row.PE)}>
+                        {peLtp}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       <form onSubmit={handlePunchTrade} className="flex flex-col gap-6">
         
@@ -144,8 +286,8 @@ export default function TradePage() {
         {/* Basic Order Details */}
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="text-xs text-gray-500 ml-1 font-medium">Quantity</label>
-            <input required type="number" min="1" value={quantity} onChange={(e) => setQuantity(e.target.value)} className="w-full mt-1 px-4 py-3 bg-white border rounded-xl focus:ring-2 focus:ring-blue-600 outline-none text-gray-900" />
+            <label className="text-xs text-gray-500 ml-1 font-medium">Quantity (Lot: {selectedSymbol?.lot_size || 1})</label>
+            <input required type="number" min="1" step={selectedSymbol?.lot_size || 1} value={quantity} onChange={(e) => setQuantity(e.target.value)} className="w-full mt-1 px-4 py-3 bg-white border rounded-xl focus:ring-2 focus:ring-blue-600 outline-none text-gray-900" />
           </div>
           <div>
             <label className="text-xs text-gray-500 ml-1 font-medium">Product</label>
