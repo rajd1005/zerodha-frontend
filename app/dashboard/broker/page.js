@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import axios from 'axios';
-import { Key, Plus, Save, RefreshCw } from 'lucide-react';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { Key, Plus, Save, ExternalLink } from 'lucide-react';
 
-export default function BrokerPage() {
+function BrokerContent() {
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -15,8 +16,9 @@ export default function BrokerPage() {
   const [apiSecret, setApiSecret] = useState('');
   const [accountAlias, setAccountAlias] = useState('');
   const [lotMultiplier, setLotMultiplier] = useState(1);
-  const [accessTokenInputs, setAccessTokenInputs] = useState({});
 
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
   const fetchAccounts = async () => {
@@ -34,9 +36,45 @@ export default function BrokerPage() {
     }
   };
 
+  // Automated OAuth Flow: Intercept request_token from Zerodha redirect
   useEffect(() => {
     fetchAccounts();
-  }, []);
+
+    const requestToken = searchParams.get('request_token');
+    const accountId = localStorage.getItem('pendingAuthAccountId');
+
+    if (requestToken && accountId) {
+      handleZerodhaCallback(accountId, requestToken);
+    }
+  }, [searchParams]);
+
+  const handleZerodhaCallback = async (accountId, requestToken) => {
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post(`${API_URL}/brokers/generate-session`, {
+        accountId,
+        requestToken
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      alert("Zerodha Login Successful!");
+      localStorage.removeItem('pendingAuthAccountId');
+      router.replace('/dashboard/broker'); // Clean the URL
+      fetchAccounts();
+    } catch (error) {
+      alert("Zerodha Authentication Failed: " + (error.response?.data?.error || error.message));
+    }
+  };
+
+  const initiateZerodhaLogin = (acc) => {
+    // Save the ID of the account we are trying to authenticate
+    localStorage.setItem('pendingAuthAccountId', acc._id);
+    
+    // Redirect user to Zerodha's Kite Connect Login page
+    const loginUrl = `https://kite.trade/connect/login?v=3&api_key=${acc.apiKey}`;
+    window.location.href = loginUrl;
+  };
 
   const handleAddAccount = async (e) => {
     e.preventDefault();
@@ -53,24 +91,6 @@ export default function BrokerPage() {
       fetchAccounts();
     } catch (error) {
       alert("Failed to add account: " + (error.response?.data?.error || error.message));
-    }
-  };
-
-  const handleUpdateToken = async (id) => {
-    try {
-      const token = localStorage.getItem('token');
-      const accessToken = accessTokenInputs[id];
-      if (!accessToken) return alert("Please enter an access token");
-
-      await axios.put(`${API_URL}/brokers/${id}/token`, { accessToken }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      
-      alert("Token updated successfully!");
-      setAccessTokenInputs({ ...accessTokenInputs, [id]: '' });
-      fetchAccounts();
-    } catch (error) {
-      alert("Failed to update token");
     }
   };
 
@@ -129,29 +149,34 @@ export default function BrokerPage() {
                 </div>
               </div>
 
-              {/* Daily Access Token Input */}
+              {/* Automated Login Button / Status */}
               <div className="mt-4 pt-4 border-t border-gray-100">
-                <label className="text-xs text-gray-500 font-medium mb-1 block">Daily Access Token</label>
-                <div className="flex gap-2">
-                  <input 
-                    type="text" 
-                    placeholder={acc.accessToken ? "Token active" : "Paste daily token here"}
-                    value={accessTokenInputs[acc._id] || ''}
-                    onChange={(e) => setAccessTokenInputs({ ...accessTokenInputs, [acc._id]: e.target.value })}
-                    className="flex-1 px-3 py-2 bg-gray-50 border rounded-lg focus:ring-2 focus:ring-blue-600 outline-none text-sm text-gray-900"
-                  />
+                {acc.accessToken ? (
+                  <div className="text-sm font-medium text-green-600 flex items-center justify-center gap-2 py-2 bg-green-50 rounded-xl">
+                    <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> Connected Today
+                  </div>
+                ) : (
                   <button 
-                    onClick={() => handleUpdateToken(acc._id)}
-                    className="bg-gray-900 text-white px-3 py-2 rounded-lg text-sm font-medium active:scale-95 transition"
+                    onClick={() => initiateZerodhaLogin(acc)}
+                    className="w-full bg-[#ff5722] text-white py-3 rounded-xl font-bold flex justify-center items-center gap-2 shadow-md active:scale-95 transition"
                   >
-                    <RefreshCw className="w-4 h-4" />
+                    Log in with Zerodha <ExternalLink className="w-4 h-4" />
                   </button>
-                </div>
+                )}
               </div>
             </div>
           ))}
         </div>
       )}
     </div>
+  );
+}
+
+// Next.js 13+ requires useSearchParams to be wrapped in a Suspense boundary
+export default function BrokerPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-center text-gray-500 mt-20">Loading Broker Data...</div>}>
+      <BrokerContent />
+    </Suspense>
   );
 }
